@@ -88,13 +88,25 @@ def main(argv=None):
         out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
         out_rows = []
         for r in rows:
+            task_id = r.get("task_id") or r.get("case_id", "TASK-01")
+            target_id = r.get("target_identifier") or r.get("patient_synthetic_id", "TARGET-01")
+            
+            raw_primary = r.get("primary_metric") or r.get("metric_primary", 15.0)
+            raw_secondary = r.get("secondary_metric") or r.get("metric_secondary", 5.0)
+            status_desc = r.get("status_descriptor") or r.get("status_flag", "NOMINAL")
+            raw_critical = r.get("is_critical_flag") if "is_critical_flag" in r else r.get("is_stat", False)
+            if isinstance(raw_critical, str):
+                is_crit = raw_critical.strip().lower() in ("true", "1", "yes")
+            else:
+                is_crit = bool(raw_critical)
+
             payload = SystemTaskPayload(
-                task_id=r.get("task_id", "TASK-01"),
-                target_identifier=r.get("target_identifier", "TARGET-01"),
-                primary_metric=float(r.get("primary_metric", 15.0)),
-                secondary_metric=float(r.get("secondary_metric", 5.0)),
-                status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
+                task_id=task_id,
+                target_identifier=target_id,
+                primary_metric=float(raw_primary),
+                secondary_metric=float(raw_secondary),
+                status_descriptor=status_desc,
+                is_critical_flag=is_crit,
             )
             dossier = supervisor.process_task(payload)
             row_dict = dict(r)

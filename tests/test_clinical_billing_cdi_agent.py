@@ -63,3 +63,10 @@ def test_supervisor_consensus_and_audit():
     assert main(["audit", "--task-id", "CLI-TEST-01"]) == 0
     assert main(["chat", "Explain", "specifications"]) == 0
     assert main(["verify-audit"]) == 0
+    tmp_out = Path("tests_batch_out.csv")
+    try:
+        assert main(["batch", "-i", "sample.csv", "-o", str(tmp_out)]) == 0
+        assert tmp_out.exists()
+    finally:
+        if tmp_out.exists():
+            tmp_out.unlink()
