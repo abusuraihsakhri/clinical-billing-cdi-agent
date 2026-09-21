@@ -1,11 +1,8 @@
-"""
-Pydantic v2 schemas and data definitions for Clinical Billing Cdi Agent.
-Domain: Clinical & Biomedical AI
-Standard: CAP / CLSI / ISO Standards
-"""
+"""Pydantic data models for the legacy-compatible deterministic rule path."""
 import datetime
 from enum import Enum
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
 
 
@@ -22,13 +19,13 @@ class SystemIntegrityStatus(str, Enum):
 
 
 class SystemTaskPayload(BaseModel):
-    task_id: str = Field(..., description="Unique task / case identifier")
-    target_identifier: str = Field(..., description="Entity, patient key, or genomic/cryptographic target")
-    primary_metric: float = Field(..., description="Primary domain measurement or score")
-    secondary_metric: float = Field(default=0.0, description="Secondary kinetic or confidence score")
-    status_descriptor: str = Field(default="NOMINAL", description="Status code or phenotype descriptor")
-    is_critical_flag: bool = Field(default=False, description="Emergency escalation or high priority trigger")
-    attributes: Dict[str, Any] = Field(default_factory=dict, description="Metadata key-value pairs")
+    task_id: str = Field(..., description="Unique demonstration task identifier")
+    target_identifier: str = Field(..., description="Synthetic or de-identified target identifier")
+    primary_metric: float = Field(..., description="Primary demonstration measurement")
+    secondary_metric: float = Field(default=0.0, description="Secondary demonstration measurement")
+    status_descriptor: str = Field(default="NOMINAL", description="Rule-matching status descriptor")
+    is_critical_flag: bool = Field(default=False, description="Explicit priority flag")
+    attributes: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
 
@@ -39,7 +36,7 @@ class AgentAlert(BaseModel):
     summary: str
     technical_details: str
     actionable_remediation: str
-    standard_reference: str = "CAP / CLSI / ISO Standards"
+    standard_reference: str = "Configured demonstration rule"
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
@@ -49,7 +46,7 @@ class AgentAlert(BaseModel):
 class ConsensusDossier(BaseModel):
     dossier_id: str
     system_slug: str = "clinical-billing-cdi-agent"
-    domain: str = "Clinical & Biomedical AI"
+    domain: str = "Clinical documentation workflow demonstration"
     task_id: str
     target_identifier: str
     overall_urgency: UrgencyLevel
@@ -57,7 +54,7 @@ class ConsensusDossier(BaseModel):
     total_alerts: int
     critical_alerts_count: int
     alerts: List[AgentAlert]
-    standard_reference: str = "CAP / CLSI / ISO Standards"
+    standard_reference: str = "No validated clinical standard implemented"
     consensus_summary: str
     audit_hash: str
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())

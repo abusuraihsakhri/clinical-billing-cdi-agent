@@ -1,12 +1,8 @@
-"""
-Clinical Data Models & Enums for CDI-Sentinel: Clinical Documentation Improvement & HCC Risk Adjustment Agent.
-Domain: Health Information Management
-Standard: CMS-HCC Risk Adjustment & ACDIS Standards
-"""
+"""Data models for the deterministic clinical documentation workflow prototype."""
 import datetime
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict
 
 
 class UrgencyLevel(str, Enum):
@@ -43,7 +39,7 @@ class AgentAlert:
     title: str
     clinical_finding: str
     actionable_recommendation: str
-    guideline_citation: str = "CMS-HCC Risk Adjustment & ACDIS Standards"
+    guideline_citation: str = "Configured demonstration rule"
     timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:

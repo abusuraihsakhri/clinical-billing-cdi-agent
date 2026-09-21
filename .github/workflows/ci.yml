@@ -1,45 +1,88 @@
-name: Clinical Billing CDI Agent CI/CD & Security Verification
+name: Clinical Billing CDI CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
+
+permissions:
+  contents: read
 
 jobs:
-  test-and-audit:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install fastapi uvicorn pydantic pytest
+      - name: Install project and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api,test]"
 
-    - name: Run Pytest Suite
-      run: |
-        python -m pytest -p no:zarr -v
+      - name: Compile Python sources
+        run: python -m compileall -q agents clinical_billing_cdi_agent cdi_sentinel.py cli.py enrichment.py simulator.py
 
-    - name: Run CLI Batch Smoke Test
-      run: |
-        python cli.py batch -i sample.csv -o out_smoke.csv
-        test -f out_smoke.csv
-        rm out_smoke.csv
+      - name: Run test suite
+        run: python -m pytest -p no:zarr -v
 
-    - name: Security SAST & Zero-PHI Audit
-      run: |
-        python -c "
-        from agents.base import PHIGuard, AuditLogger
-        assert AuditLogger.verify_integrity() is True
-        print('Security & Zero-PHI Audit Passed!')
-        "
+      - name: Run CLI smoke tests
+        run: |
+          python cli.py batch -i sample.csv -o out_smoke.csv
+          python -m clinical_billing_cdi_agent.cli audit --case-id CI-CASE --primary 10 --secondary 3 --status NORMAL
+          test -s out_smoke.csv
+          rm out_smoke.csv
+
+      - name: Verify browser Python engine
+        run: |
+          python - <<'PY'
+          import json
+          from clinical_billing_cdi_agent.browser_engine import evaluate_case_json
+          result = json.loads(evaluate_case_json('{"case_id":"CI","primary_metric":30,"secondary_metric":2,"status_flag":"NORMAL","is_stat":false}'))
+          assert result["outcome"] == "REVIEW_RECOMMENDED"
+          assert result["alert_count"] == 1
+          PY
+
+      - name: Verify static site files
+        run: |
+          test -f site/index.html
+          test -f site/app.css
+          test -f site/app.js
+          grep -q "Analyze case" site/index.html
+
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install audit tools and project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api,test]"
+          python -m pip install pip-audit bandit ruff
+
+      - name: Dependency vulnerability audit
+        run: pip-audit --skip-editable
+
+      - name: Static security scan
+        run: bandit -q -r agents clinical_billing_cdi_agent cdi_sentinel.py cli.py enrichment.py simulator.py -ll
+
+      - name: Critical lint checks
+        run: ruff check agents clinical_billing_cdi_agent cdi_sentinel.py cli.py enrichment.py simulator.py --select E9,F63,F7,F82

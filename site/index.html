@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-eval' 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>Clinical Billing / CDI Rule Demonstrator</title>
+  <link rel="stylesheet" href="./app.css">
+  <script defer src="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Browser-based Python demo</p>
+        <h1>Clinical Billing / CDI Rule Demonstrator</h1>
+        <p class="subtitle">Deterministic example rules for testing workflow mechanics. Not clinical, coding, or reimbursement guidance.</p>
+      </div>
+      <div class="top-actions">
+        <span id="runtimeBadge" class="badge" aria-live="polite">Loading Python…</span>
+        <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle dark mode">◐</button>
+      </div>
+    </header>
+
+    <section class="workspace" aria-label="Rule analysis workspace">
+      <form id="caseForm" class="panel input-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Single case</h2>
+            <p>All processing stays in this browser tab.</p>
+          </div>
+          <button id="resetButton" class="text-button" type="button">Reset</button>
+        </div>
+
+        <div class="field-grid">
+          <label>
+            <span>Case ID</span>
+            <input id="caseId" name="case_id" value="CASE-001" autocomplete="off">
+          </label>
+          <label>
+            <span>Status</span>
+            <select id="statusFlag" name="status_flag">
+              <option>NORMAL</option>
+              <option selected>DISCORDANT</option>
+              <option>SUSPICIOUS</option>
+              <option>EQUIVOCAL</option>
+            </select>
+          </label>
+          <label>
+            <span>Primary metric</span>
+            <input id="primaryMetric" name="primary_metric" type="number" step="any" value="28.5" required>
+            <small>Demo threshold: 25</small>
+          </label>
+          <label>
+            <span>Secondary metric</span>
+            <input id="secondaryMetric" name="secondary_metric" type="number" step="any" value="14.2" required>
+            <small>Demo threshold: 12</small>
+          </label>
+        </div>
+
+        <label class="check-row">
+          <input id="priorityFlag" name="is_stat" type="checkbox">
+          <span>
+            <strong>Priority flag</strong>
+            <small>Triggers the priority review rule.</small>
+          </span>
+        </label>
+
+        <button id="analyzeButton" class="primary-button" type="submit">Analyze case</button>
+      </form>
+
+      <section class="panel result-panel" aria-live="polite">
+        <div class="panel-head">
+          <div>
+            <h2>Result</h2>
+            <p id="resultHint">Run the configured rules to see a result.</p>
+          </div>
+          <span id="outcomePill" class="outcome neutral">Ready</span>
+        </div>
+
+        <div class="metrics">
+          <article>
+            <span>Outcome</span>
+            <strong id="outcomeValue">—</strong>
+          </article>
+          <article>
+            <span>Alerts</span>
+            <strong id="alertCount">0</strong>
+          </article>
+          <article>
+            <span>Runtime</span>
+            <strong id="runtimeValue">—</strong>
+          </article>
+        </div>
+
+        <div id="alerts" class="alerts">
+          <div class="empty-state">No analysis has been run.</div>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel batch-panel">
+      <div class="panel-head batch-head">
+        <div>
+          <h2>CSV batch</h2>
+          <p>Use the repository schema or the included sample CSV. Files are processed locally.</p>
+        </div>
+        <div class="batch-actions">
+          <input id="csvFile" class="file-input" type="file" accept=".csv,text/csv">
+          <button id="batchButton" class="secondary-button" type="button">Process CSV</button>
+          <button id="downloadButton" class="secondary-button" type="button" disabled>Download result</button>
+        </div>
+      </div>
+      <p id="batchStatus" class="batch-status">No file selected.</p>
+    </section>
+
+    <footer>
+      <span>Configured rules: primary &gt; 25, secondary &gt; 12, priority flag, and status keywords.</span>
+      <a href="https://github.com/abusuraihsakhri/clinical-billing-cdi-agent" rel="noopener noreferrer">Repository</a>
+    </footer>
+  </main>
+</body>
+</html>

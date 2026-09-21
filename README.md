@@ -1,183 +1,100 @@
-# Clinical Billing & CDI Agent (CDI-Sentinel)
+# Clinical Billing / CDI Rule Demonstrator
 
-> **Domain:** Health Information Management, Clinical Documentation Improvement (CDI), and CMS-HCC Risk Adjustment  
-> **Reference Standards:** CMS-HCC Risk Adjustment Model v28/v24, ACDIS/AHIMA Clinical Documentation Guidelines, Official ICD-10-CM Coding Guidelines, HIPAA Safe Harbor Privacy Rule
+A deterministic Python prototype for testing clinical-documentation workflow mechanics: rule evaluation, CSV batch processing, local audit records, an optional FastAPI interface, and a browser-based demonstration UI.
 
-<div align="center">
+> **Scope:** This repository does **not** implement validated CMS-HCC coefficients, ICD-10 coding logic, physician-query compliance rules, reimbursement calculations, or a HIPAA de-identification system. The thresholds in the code are demonstration values and must not be used for clinical, coding, or reimbursement decisions.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
+## What it does
 
-</div>
+The maintained workflow evaluates four simple conditions:
 
----
+- primary metric greater than 25
+- secondary metric greater than 12
+- an explicit priority flag
+- configured status keywords such as DISCORDANT, EQUIVOCAL, or SUSPICIOUS
 
-## 📖 Executive Summary & Clinical Context
+The result is a deterministic review status plus rule alerts. Public legacy class names are retained where practical for compatibility, but names such as HCCRiskWeightCalculatorAgent and PhysicianQuerySynthesizerAgent do not imply that those functions are implemented.
 
-**Clinical Billing CDI Agent (`CDI-Sentinel`)** is an automated clinical documentation improvement and hierarchical condition category (HCC) risk-adjustment surveillance engine. In modern value-based care and prospective payment systems (such as Medicare Advantage and Inpatient Prospective Payment Systems [IPPS]), documentation omissions directly compromise risk score accuracy, physician query compliance, and appropriate hospital reimbursement.
+## Browser application
 
-The system performs:
-1. **Clinical Documentation Gap Scanning:** Detects uncaptured MCC/CC (Major Complication/Comorbidity) opportunities from clinical parameters.
-2. **CMS-HCC Risk Score Optimization:** Calculates hierarchical risk coefficients and projects risk-adjustment impact.
-3. **Non-Leading Physician Query Synthesis:** Generates compliant physician clarification queries adhering strictly to ACDIS/AHIMA standards.
-4. **Zero-PHI Interception & Tamper-Evident HMAC Audit Trails:** Enforces strict HIPAA Safe Harbor de-identification before any reasoning or logging occurs.
+The site/ application provides:
 
----
+- single-case analysis with a visible **Analyze case** action
+- CSV upload, local batch processing, and CSV download
+- light mode by default with a dark-mode toggle
+- responsive desktop/mobile layout
+- client-side Python through Pyodide
+- a deterministic JavaScript fallback if the Pyodide runtime cannot load
 
-## 📐 Clinical & Domain Formulations
+The browser application does not upload case or CSV content to this repository or to an application server. Pyodide itself is loaded from the jsDelivr CDN, so opening the page requires a network request to that CDN unless the JavaScript fallback is used. Theme preference is stored in browser localStorage.
 
-### 1. CMS-HCC Risk Adjustment Factor (RAF) Score Calculation
+## Python usage
 
-The aggregated Risk Adjustment Factor ($RAF$) score for a patient encounter is modeled by summing demographic factors, baseline disease categories, and disease interaction increments:
+Python 3.10 or newer is required.
 
-$$\text{RAF}_{\text{total}} = \beta_{\text{demographic}} + \sum_{k \in \text{HCC}} w_k \cdot \mathbb{I}(k) + \sum_{(i,j) \in \text{Interactions}} \gamma_{ij} \cdot \mathbb{I}(i) \cdot \mathbb{I}(j)$$
+~~~bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[api,test]"
+~~~
 
-Where:
-- $\beta_{\text{demographic}}$: Base risk weight dictated by patient age, sex, Medicaid dual status, and original Medicare entitlement reason.
-- $w_k$: Relative risk weight for Hierarchical Condition Category $k$.
-- $\mathbb{I}(k) \in \{0, 1\}$: Binary indicator whether disease condition $k$ is supported by clinical chart documentation.
-- $\gamma_{ij}$: Additional disease-to-disease interaction coefficient (e.g., Diabetes + Congestive Heart Failure).
+Run a single case:
 
-### 2. Comorbidity Capture Completeness Index (CCCI)
+~~~bash
+clinical-billing-cdi-engine audit \
+  --case-id CASE-001 \
+  --primary 28.5 \
+  --secondary 14.2 \
+  --status DISCORDANT
+~~~
 
-$$\text{CCCI} = \frac{\sum_{i=1}^{N} \text{Validated CC/MCC Elements}_i}{\sum_{i=1}^{N} \text{Suspected Clinical Indicators}_i} \times 100\%$$
+Process a CSV file:
 
-A $\text{CCCI} < 85\%$ triggers automated CDI review workflows for potential documentation discordance.
+~~~bash
+python cli.py batch -i sample.csv -o results.csv
+~~~
 
-### 3. Financial & Revenue Yield Differential
+Run the optional API:
 
-$$\Delta \text{Revenue} = \Delta \text{RAF} \times \text{Base Rate} \times \text{Coding Normalization Factor}$$
+~~~bash
+clinical-billing-cdi-engine serve
+~~~
 
----
+The API exposes /health, /api/audit, and /api/chat. The chat route is a deterministic local response helper; it does not call an external language model.
 
-## 📊 Reference Diagnostic Criteria & Risk Weight Matrix
+## Audit and identifier guard
 
-| Category Code | Clinical Condition | Typical Severity Tier | Relative Risk Weight ($w_k$) | Documentation Gap Check |
-|:---|:---|:---:|:---:|:---|
-| **HCC 18** | Diabetes with Chronic Complications | CC / Moderate | $0.302 - 0.368$ | Specificity of end-organ involvement (nephropathy, neuropathy) |
-| **HCC 85** | Congestive Heart Failure (Systolic/Diastolic) | CC / High | $0.331 - 0.380$ | Acuity (Acute, Chronic, Acute-on-Chronic), ejection fraction |
-| **HCC 96** | Specified Heart Arrhythmias (Atrial Fibrillation) | CC / Moderate | $0.278$ | Persistent vs. paroxysmal vs. chronic atrial fibrillation |
-| **HCC 136** | Chronic Kidney Disease (Stage 4, 5, ESRD) | CC / High | $0.289 - 0.521$ | GFR baseline staging; linkage to hypertensive etiology |
-| **MCC** | Severe Sepsis / Septic Shock / Acute Organ Failure | MCC / STAT | $0.780 - 1.250$ | Clinical lactate kinetics, organ dysfunction criteria, SOFA |
+The legacy-compatible workflow includes an in-memory HMAC-SHA256 chained audit log. AUDIT_SECRET_KEY can provide a persistent configured key; otherwise a random process-local key is generated. Integrity verification recomputes record signatures and verifies chain linkage.
 
----
+The identifier guard blocks a limited set of common direct-identifier patterns. It is a defensive programming aid, **not** a complete HIPAA Safe Harbor implementation and not a substitute for an institutional de-identification pipeline.
 
-## ⚙️ Architectural Sub-Agent Hierarchy
+## Testing
 
-```
-+-------------------------------------------------------------------------+
-|                      SystemSupervisor / CDICoordinator                  |
-|                 (Consensus Arbitration & Zero-PHI Guard)                |
-+--------------------+--------------------+-------------------------------+
-                     |                    |
-                     v                    v
-+--------------------+---+  +-------------+-------+  +--------------------+---+
-| DocumentationGapScanner |  | SafetyEscalation    |  | ProtocolConformance|
-|      (QC Worker)       |  |   (Safety Worker)   |  | (Physician Query)  |
-| - Primary Metric Audit |  | - STAT Kinetics     |  | - Spec Concordance |
-| - CC/MCC Discovery     |  | - Interlock Alerts  |  | - Query Validation |
-+--------------------+---+  +-------------+-------+  +--------------------+---+
-                     \                    |                   /
-                      \                   |                  /
-                       +------------------v-----------------+
-                       |    HMAC-SHA256 Cryptographic Log   |
-                       |       Tamper-Evident Blockchain    |
-                       +------------------------------------+
-```
-
----
-
-## 💻 CLI Quickstart & Usage
-
-The application provides a command-line interface supporting single-case auditing, supervisory interactive queries, cryptographic integrity verification, and high-throughput CSV batch evaluation.
-
-### 1. Single Clinical Case Audit
-```bash
-python cli.py audit --task-id CASE-2026-001 --target SYNTH-PT-881 --primary 28.5 --secondary 14.2 --status DISCORDANT --critical
-```
-
-### 2. Supervisory Clarification Query (Chat)
-```bash
-python cli.py chat "Explain ACDIS documentation compliance criteria for acute respiratory failure"
-```
-
-### 3. Cryptographic Audit Verification
-```bash
-python cli.py verify-audit
-```
-
-### 4. High-Throughput Batch Processing
-Process clinical records directly from a CSV file:
-```bash
-python cli.py batch -i sample.csv -o out_results.csv
-```
-Or using explicit long arguments:
-```bash
-python cli.py batch --input sample.csv --output out_results.csv
-```
-
-### Parameter Reference
-
-| Command | Option | Description | Default |
-|:---|:---|:---|:---|
-| `audit` | `--task-id` | Unique task/case identifier | `TASK-2026-001` |
-| `audit` | `--target` | Patient synthetic identifier / target | `KEY-TARGET-01` |
-| `audit` | `--primary` | Primary clinical metric or risk index | `28.5` |
-| `audit` | `--secondary` | Secondary kinetic parameter or score | `14.2` |
-| `audit` | `--status` | Diagnostic concordance descriptor | `DISCORDANT` |
-| `audit` | `--critical` | Flag for STAT clinical emergency | `False` |
-| `batch` | `-i`, `--input` | Input CSV filepath containing case rows | Required |
-| `batch` | `-o`, `--output` | Output CSV destination for enriched audit | `results.csv` |
-| `serve` | `--host` / `--port` | Host address and port for FastAPI server | `127.0.0.1:8000` |
-
----
-
-## 📋 Batch CSV Data Schema
-
-The `sample.csv` and batch pipeline support both clinical HIM schemas and task-oriented records:
-
-| Field | Type | Description | Example |
-|:---|:---:|:---|:---|
-| `case_id` / `task_id` | String | Unique encounter or chart identifier | `CASE-001` |
-| `patient_synthetic_id` / `target_identifier` | String | De-identified synthetic patient token | `SYNTH-01` |
-| `metric_primary` / `primary_metric` | Float | Primary clinical biomarker / risk measurement | `25.4` |
-| `metric_secondary` / `secondary_metric` | Float | Secondary kinetic parameter or severity score | `14.2` |
-| `is_stat` / `is_critical_flag` | Boolean | Priority triage indicator (`True`/`False`) | `True` |
-| `status_flag` / `status_descriptor` | String | Diagnostic concordance state | `DISCORDANT` |
-
-The batch process appends clinical surveillance results:
-- `overall_urgency`: Evaluated urgency tier (`ROUTINE`, `ELEVATED_RISK`, `CRITICAL_STAT_PANIC`).
-- `integrity_status`: Diagnostic concordance verification (`VALIDATED_OPTIMAL`, `DISCORDANT_ANOMALY`, `RECALIBRATION_REQUIRED`).
-- `total_alerts`: Number of sub-agent clinical alerts raised.
-- `audit_hash`: HMAC-SHA256 tamper-evident integrity signature.
-
----
-
-## 🧪 Testing & Verification
-
-Run the comprehensive pytest test suite:
-```bash
+~~~bash
 python -m pytest -p no:zarr -v
-```
-
-Execute a CLI batch smoke test:
-```bash
+python -m compileall -q agents clinical_billing_cdi_agent cdi_sentinel.py cli.py enrichment.py simulator.py
 python cli.py batch -i sample.csv -o out_smoke.csv
-python -c "import os; assert os.path.exists('out_smoke.csv'); os.remove('out_smoke.csv')"
-```
+~~~
 
----
+GitHub Actions tests Python 3.10 through 3.13, compiles the Python sources, runs the test suite, exercises both CLI paths, checks the browser-compatible Python engine, and verifies the static-site files.
 
-## 🛡️ Zero-PHI Compliance & Auditability
+## Repository layout
 
-- **HIPAA Safe Harbor Compliance:** Regex and AST interceptors automatically block 18 HIPAA Safe Harbor direct identifiers (Social Security Numbers, Medical Record Numbers, Names, Phone Numbers).
-- **Tamper-Evident SHA-256 Audit Trail:** Every clinical audit event, parameter mutation, and supervisory action generates a sequentially chained cryptographic digest.
+- clinical_billing_cdi_agent/ — maintained Python package and browser-compatible engine
+- agents/ — legacy-compatible rule, API, audit, telemetry, and metrics modules
+- cdi_sentinel.py — compatibility facade for the earlier interface
+- cli.py — legacy-compatible command-line interface
+- site/ — static browser application
+- tests/ — regression tests
+- .github/workflows/ — CI and GitHub Pages deployment
 
----
+enrichment.py retains historical public class names as compatibility threshold modules. It does not implement the advanced features suggested by those legacy names.
 
-## 📜 License
+## Browser compatibility
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+The static application targets current versions of Chrome, Edge, Firefox, and Safari with WebAssembly and modern JavaScript enabled. If the external Python runtime is unavailable, core single-case and CSV workflows continue through the local JavaScript fallback.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
