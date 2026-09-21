@@ -1,45 +1,58 @@
+"""Deterministic demonstration rules for the clinical billing/CDI prototype.
+
+These thresholds are repository configuration values, not validated clinical,
+coding, reimbursement, or CMS-HCC criteria.
 """
-Clinical Algorithmic Engine & Guideline Rules for CDI-Sentinel: Clinical Documentation Improvement & HCC Risk Adjustment Agent.
-Domain: Health Information Management
-Standard: CMS-HCC Risk Adjustment & ACDIS Standards
-"""
-import math
-from typing import Dict, Any, List, Optional
-from .models import ClinicalCasePayload, AgentAlert, UrgencyLevel, ClinicalIntegrityStatus
+from typing import Any, Dict, Optional
 
 
 class ClinicalDomainEngine:
-    GUIDELINE = "CMS-HCC Risk Adjustment & ACDIS Standards"
-    PRIMARY_BASELINE_LIMIT = 20.0
-    SECONDARY_ALERT_LIMIT = 10.0
+    PRIMARY_ALERT_LIMIT = 25.0
+    SECONDARY_ALERT_LIMIT = 12.0
+    STATUS_KEYWORDS = ("DISCORDANT", "EQUIVOCAL", "SUSPICIOUS")
 
     @classmethod
     def evaluate_primary_index(cls, value: float) -> Optional[Dict[str, Any]]:
-        if value > cls.PRIMARY_BASELINE_LIMIT:
+        if value > cls.PRIMARY_ALERT_LIMIT:
             return {
-                "title": "Primary Metric Threshold Exceeded",
-                "finding": f"Observed value ({value:.2f}) exceeds CMS-HCC Risk Adjustment & ACDIS Standards clinical baseline limit ({cls.PRIMARY_BASELINE_LIMIT:.1f}).",
-                "recommendation": "Perform immediate secondary verification and calibration review.",
+                "title": "Primary Metric Review Trigger",
+                "finding": (
+                    f"Observed value ({value:.2f}) exceeds the configured "
+                    f"demonstration threshold ({cls.PRIMARY_ALERT_LIMIT:.1f})."
+                ),
+                "recommendation": "Review the source data and the configured rule before acting.",
             }
         return None
 
     @classmethod
-    def evaluate_secondary_kinetics(cls, value: float, is_stat: bool) -> Optional[Dict[str, Any]]:
+    def evaluate_secondary_kinetics(
+        cls,
+        value: float,
+        is_stat: bool,
+    ) -> Optional[Dict[str, Any]]:
         if value > cls.SECONDARY_ALERT_LIMIT or is_stat:
             return {
-                "title": "STAT Kinetic Escalation Triggered",
-                "finding": f"Kinetic parameter ({value:.2f}) with STAT={is_stat} requires prioritized supervision.",
-                "recommendation": "Activate closed-loop verbal clinician notification protocol per Joint Commission standards.",
+                "title": "Priority Review Trigger",
+                "finding": (
+                    f"Secondary value ({value:.2f}) and priority flag "
+                    f"(is_stat={is_stat}) triggered the configured rule."
+                ),
+                "recommendation": "Escalate for human review according to local policy.",
             }
         return None
 
     @classmethod
-    def evaluate_biomarker_concordance(cls, status_flag: str, biomarkers: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def evaluate_biomarker_concordance(
+        cls,
+        status_flag: str,
+        biomarkers: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        del biomarkers
         status_upper = str(status_flag).upper()
-        if "DISCORDANT" in status_upper or "EQUIVOCAL" in status_upper or "MUTANT" in status_upper:
+        if any(keyword in status_upper for keyword in cls.STATUS_KEYWORDS):
             return {
-                "title": "Phenotypic / Biomarker Discordance Identified",
-                "finding": f"Status flag '{status_flag}' indicates divergence from standard diagnostic concordance.",
-                "recommendation": f"Order reflex confirmatory testing per CMS-HCC Risk Adjustment & ACDIS Standards clinical recommendations.",
+                "title": "Status Descriptor Review Trigger",
+                "finding": f"Status flag '{status_flag}' matches a configured review keyword.",
+                "recommendation": "Verify the underlying documentation before any coding or clinical decision.",
             }
         return None
