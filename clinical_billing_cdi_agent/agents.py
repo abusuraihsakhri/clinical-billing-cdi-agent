@@ -105,5 +105,5 @@ class CDICoordinator:
         if "status" in query or "summary" in query:
             return f"Prototype currently holds {len(self.case_registry)} case result(s) in process memory."
         if "guideline" in query or "standard" in query:
-            return "No clinical guideline or CMS-HCC coefficient model is implemented; the repository uses configurable demonstration thresholds."
+            return "No clinical guideline or CMS-HCC coefficient model is implemented; the repository uses deterministic configurable demonstration thresholds."
         return "Local deterministic prototype is available. It does not call an external language model."
