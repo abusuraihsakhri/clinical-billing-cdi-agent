@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,10 +8,9 @@ version = "2.1.0"
 description = "Deterministic clinical documentation workflow prototype with CLI, API, CSV processing, and a browser demo"
 readme = "README.md"
 authors = [{ name = "NAME" }]
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.10"
@@ -34,3 +33,14 @@ clinical-billing-cdi-engine = "clinical_billing_cdi_agent.cli:main"
 [project.urls]
 Homepage = "https://abusuraihsakhri.github.io/clinical-billing-cdi-agent/"
 Repository = "https://github.com/abusuraihsakhri/clinical-billing-cdi-agent"
+
+[tool.setuptools]
+packages = ["clinical_billing_cdi_agent", "agents"]
+py-modules = [
+    "cdi_sentinel",
+    "cdi_sentinel_app",
+    "clinical_billing_cdi_agent_app",
+    "cli",
+    "enrichment",
+    "simulator",
+]
