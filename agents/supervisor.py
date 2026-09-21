@@ -1,44 +1,38 @@
-"""
-Supervisor Orchestrator & Operations Intelligence for Clinical Billing Cdi Agent.
-Domain: Clinical & Biomedical AI
-"""
+"""Coordinator for the legacy-compatible deterministic rule workflow."""
 import uuid
-from typing import Dict, Any, List, Optional
-from .base import AuditLogger, ActionExecutor, PHIGuard
-from .models import SystemTaskPayload, AgentAlert, ConsensusDossier, UrgencyLevel, SystemIntegrityStatus
-from .workers import InvariantQCWorker, SafetyEscalationWorker, ProtocolConformanceWorker
+from typing import Dict
+
+from .base import AuditLogger, PHIGuard
 from .llm_factory import LLMFactory
+from .models import ConsensusDossier, SystemIntegrityStatus, SystemTaskPayload, UrgencyLevel
+from .workers import InvariantQCWorker, ProtocolConformanceWorker, SafetyEscalationWorker
 
 
 class SystemSupervisor:
-    """Master Distributed Component Coordinator for Clinical Billing Cdi Agent."""
-
     def __init__(self, model_provider: str = "mock"):
         self.qc_worker = InvariantQCWorker()
         self.safety_worker = SafetyEscalationWorker()
         self.conformance_worker = ProtocolConformanceWorker()
-        self.llm = LLMFactory.create(model_provider, system_name="Clinical Billing Cdi Agent")
+        self.llm = LLMFactory.create(model_provider, system_name="Clinical Billing CDI Agent")
         self.dossier_registry: Dict[str, ConsensusDossier] = {}
 
     def process_task(self, payload: SystemTaskPayload, actor: str = "SystemSupervisor") -> ConsensusDossier:
-        # Zero-PHI outbound validation
         PHIGuard.assert_no_phi(payload.task_id)
         PHIGuard.assert_no_phi(payload.target_identifier)
         PHIGuard.assert_no_phi(payload.status_descriptor)
 
-        # Multi-worker evaluations
-        all_alerts: List[AgentAlert] = []
-        all_alerts.extend(self.qc_worker.evaluate(payload))
-        all_alerts.extend(self.safety_worker.evaluate(payload))
-        all_alerts.extend(self.conformance_worker.evaluate(payload))
+        alerts = []
+        alerts.extend(self.qc_worker.evaluate(payload))
+        alerts.extend(self.safety_worker.evaluate(payload))
+        alerts.extend(self.conformance_worker.evaluate(payload))
 
-        crit_count = sum(1 for a in all_alerts if a.urgency == UrgencyLevel.CRITICAL_STAT)
-        elev_count = sum(1 for a in all_alerts if a.urgency == UrgencyLevel.ELEVATED)
+        critical_count = sum(1 for alert in alerts if alert.urgency == UrgencyLevel.CRITICAL_STAT)
+        elevated_count = sum(1 for alert in alerts if alert.urgency == UrgencyLevel.ELEVATED)
 
-        if crit_count > 0:
+        if critical_count:
             overall_urgency = UrgencyLevel.CRITICAL_STAT
             integrity_status = SystemIntegrityStatus.RECALIBRATION_REQUIRED
-        elif elev_count > 0:
+        elif elevated_count:
             overall_urgency = UrgencyLevel.ELEVATED
             integrity_status = SystemIntegrityStatus.DISCORDANT
         else:
@@ -53,8 +47,8 @@ class SystemSupervisor:
                 "task_id": payload.task_id,
                 "target_identifier": payload.target_identifier,
                 "overall_urgency": overall_urgency.value,
-                "total_alerts": len(all_alerts),
-            }
+                "total_alerts": len(alerts),
+            },
         )
 
         dossier = ConsensusDossier(
@@ -63,17 +57,18 @@ class SystemSupervisor:
             target_identifier=payload.target_identifier,
             overall_urgency=overall_urgency,
             integrity_status=integrity_status,
-            total_alerts=len(all_alerts),
-            critical_alerts_count=crit_count,
-            alerts=all_alerts,
-            consensus_summary=f"Multi-agent consensus completed with status [{overall_urgency.value}]. Total alerts: {len(all_alerts)}.",
+            total_alerts=len(alerts),
+            critical_alerts_count=critical_count,
+            alerts=alerts,
+            consensus_summary=(
+                f"Configured deterministic rules completed with status "
+                f"[{overall_urgency.value}]. Total alerts: {len(alerts)}."
+            ),
             audit_hash=audit_entry["current_hash"],
         )
-
         self.dossier_registry[dossier.dossier_id] = dossier
         return dossier
 
     def query_supervisory_chat(self, query: str) -> str:
         PHIGuard.assert_no_phi(query)
-        prompt = f"Supervisor inquiry for Clinical Billing Cdi Agent under CAP / CLSI / ISO Standards: {query}"
-        return self.llm.invoke(prompt)
+        return self.llm.invoke(query)
