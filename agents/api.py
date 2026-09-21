@@ -1,19 +1,17 @@
-"""
-FastAPI REST API Server for Clinical Billing Cdi Agent.
-"""
-from typing import Dict, Any, List
+"""FastAPI server for the legacy-compatible deterministic rule workflow."""
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from .base import AuditLogger, PHIGuard
-from .models import SystemTaskPayload, ConsensusDossier
+
+from .base import AuditLogger
+from .models import SystemTaskPayload
 from .supervisor import SystemSupervisor
 
 supervisor = SystemSupervisor(model_provider="mock")
 
 app = FastAPI(
-    title="Clinical Billing Cdi Agent API",
-    description="Enterprise Distributed Component Platform (Clinical & Biomedical AI)",
-    version="3.0.0-ENTERPRISE",
+    title="Clinical Billing / CDI Rule Demonstrator API",
+    description="Deterministic prototype rules; not clinical, coding, or reimbursement guidance.",
+    version="2.1.0",
 )
 
 
@@ -23,7 +21,12 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "service": "clinical-billing-cdi-agent", "domain": "Clinical & Biomedical AI", "standard": "CAP / CLSI / ISO Standards", "version": "3.0.0-ENTERPRISE"}
+    return {
+        "status": "HEALTHY",
+        "service": "clinical-billing-cdi-agent",
+        "version": "2.1.0",
+        "scope": "deterministic prototype",
+    }
 
 
 @app.get("/metrics")
@@ -31,25 +34,28 @@ def metrics():
     return {
         "dossiers_processed_total": len(supervisor.dossier_registry),
         "audit_blocks_total": len(AuditLogger.get_trail()),
-        "system_status": "NOMINAL_OPTIMAL"
     }
 
 
 @app.post("/api/audit")
 def api_audit(payload: SystemTaskPayload):
-    dossier = supervisor.process_task(payload)
-    return dossier.to_dict()
+    try:
+        return supervisor.process_task(payload).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/chat")
 def api_chat(req: ChatRequest):
     try:
-        ans = supervisor.query_supervisory_chat(req.query)
-        return {"response": ans}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return {"response": supervisor.query_supervisory_chat(req.query)}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/audit/logs")
 def api_audit_logs():
-    return {"audit_trail": AuditLogger.get_trail(), "verified": AuditLogger.verify_integrity()}
+    return {
+        "audit_trail": AuditLogger.get_trail(),
+        "verified": AuditLogger.verify_integrity(),
+    }
