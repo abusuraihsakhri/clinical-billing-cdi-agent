@@ -21,8 +21,7 @@ function setTheme(theme) {
 
 function initTheme() {
   const stored = localStorage.getItem('theme');
-  const preferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  setTheme(stored || preferred);
+  setTheme(stored === 'dark' ? 'dark' : 'light');
 }
 
 function setRuntime(runtime, message) {
