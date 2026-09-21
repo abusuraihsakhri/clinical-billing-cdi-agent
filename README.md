@@ -1,5 +1,7 @@
 # Clinical Billing / CDI Rule Demonstrator
 
+### [Open the Live Application →](https://abusuraihsakhri.github.io/clinical-billing-cdi-agent/)
+
 A deterministic Python prototype for testing clinical-documentation workflow mechanics: rule evaluation, CSV batch processing, local audit records, an optional FastAPI interface, and a browser-based demonstration UI.
 
 > **Scope:** This repository does **not** implement validated CMS-HCC coefficients, ICD-10 coding logic, physician-query compliance rules, reimbursement calculations, or a HIPAA de-identification system. The thresholds in the code are demonstration values and must not be used for clinical, coding, or reimbursement decisions.

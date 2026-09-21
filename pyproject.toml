@@ -7,7 +7,6 @@ name = "clinical-billing-cdi-engine"
 version = "2.1.0"
 description = "Deterministic clinical documentation workflow prototype with CLI, API, CSV processing, and a browser demo"
 readme = "README.md"
-authors = [{ name = "NAME" }]
 license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
