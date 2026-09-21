@@ -59,3 +59,30 @@ jobs:
           test -f site/app.css
           test -f site/app.js
           grep -q "Analyze case" site/index.html
+
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install audit tools and project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api,test]"
+          python -m pip install pip-audit bandit ruff
+
+      - name: Dependency vulnerability audit
+        run: pip-audit --skip-editable
+
+      - name: Static security scan
+        run: bandit -q -r agents clinical_billing_cdi_agent cdi_sentinel.py cli.py enrichment.py simulator.py -ll
+
+      - name: Critical lint checks
+        run: ruff check agents clinical_billing_cdi_agent cdi_sentinel.py cli.py enrichment.py simulator.py --select E9,F63,F7,F82
