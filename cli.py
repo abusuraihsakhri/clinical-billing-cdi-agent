@@ -1,23 +1,36 @@
-"""
-Command Line Interface for Clinical Billing Cdi Agent.
-"""
+"""Command-line interface for the legacy-compatible deterministic workflow."""
 import argparse
 import csv
-import json
 import sys
+
+from agents.base import AuditLogger
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
-from agents.base import AuditLogger
 
 supervisor = SystemSupervisor(model_provider="mock")
+TRUE_VALUES = {"true", "1", "yes", "y", "on"}
+FALSE_VALUES = {"false", "0", "no", "n", "off", ""}
+
+
+def parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in TRUE_VALUES:
+        return True
+    if normalized in FALSE_VALUES:
+        return False
+    raise ValueError(f"Invalid boolean value: {value!r}")
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="clinical-billing-cdi-agent", description="Clinical Billing Cdi Agent")
+    parser = argparse.ArgumentParser(
+        prog="clinical-billing-cdi-agent",
+        description="Deterministic clinical documentation workflow prototype",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Audit
-    p_audit = subparsers.add_parser("audit", help="Run single task evaluation")
+    p_audit = subparsers.add_parser("audit", help="Run a single demonstration task")
     p_audit.add_argument("--task-id", default="TASK-2026-001")
     p_audit.add_argument("--target", default="KEY-TARGET-01")
     p_audit.add_argument("--primary", type=float, default=28.5)
@@ -25,20 +38,16 @@ def main(argv=None):
     p_audit.add_argument("--critical", action="store_true")
     p_audit.add_argument("--status", default="DISCORDANT")
 
-    # Chat
-    p_chat = subparsers.add_parser("chat", help="System configuration query")
+    p_chat = subparsers.add_parser("chat", help="Query local prototype status")
     p_chat.add_argument("query", nargs="+")
 
-    # Batch
     p_batch = subparsers.add_parser("batch", help="Batch process CSV records")
     p_batch.add_argument("-i", "--input", required=True)
     p_batch.add_argument("-o", "--output", default="results.csv")
 
-    # Verify Audit
-    subparsers.add_parser("verify-audit", help="Verify HMAC audit trail integrity")
+    subparsers.add_parser("verify-audit", help="Verify in-memory HMAC audit records")
 
-    # Serve
-    p_serve = subparsers.add_parser("serve", help="Launch FastAPI REST server")
+    p_serve = subparsers.add_parser("serve", help="Launch the optional FastAPI server")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8000)
 
@@ -54,79 +63,73 @@ def main(argv=None):
             is_critical_flag=args.critical,
         )
         dossier = supervisor.process_task(payload)
-        print("=" * 80)
-        print(f"  CLINICAL BILLING CDI AGENT")
-        print(f"  Domain: Clinical & Biomedical AI | Standard: CAP / CLSI / ISO Standards")
-        print(f"  Dossier ID: {dossier.dossier_id} | Urgency: [{dossier.overall_urgency.value}]")
-        print("=" * 80)
-        for a in dossier.alerts:
-            print(f"\n  [{a.urgency.value}] from {a.origin_worker}:")
-            print(f"  Summary: {a.summary}")
-            print(f"  Details: {a.technical_details}")
-            print(f"  Action:  {a.actionable_remediation}")
-        print(f"\n  HMAC-SHA256 Audit Hash: {dossier.audit_hash}")
-        print("=" * 80)
+        print(f"Task {dossier.task_id}: {dossier.overall_urgency.value} ({dossier.total_alerts} alerts)")
+        print("Prototype only; not clinical, coding, or reimbursement guidance.")
         return 0
 
     if args.command == "chat":
-        ans = supervisor.query_supervisory_chat(" ".join(args.query))
-        print(f"\n[Clinical Billing Cdi Agent Supervisor]:\n{ans}\n")
+        print(supervisor.query_supervisory_chat(" ".join(args.query)))
         return 0
 
     if args.command == "verify-audit":
         trail = AuditLogger.get_trail()
         valid = AuditLogger.verify_integrity()
-        print(f"Audit Trail Blocks: {len(trail)} | Cryptographic Integrity Verified: {valid}")
-        return 0
+        print(f"Audit records: {len(trail)} | HMAC integrity verified: {valid}")
+        return 0 if valid else 1
 
     if args.command == "batch":
-        with open(args.input, mode="r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            fieldnames = list(reader.fieldnames or [])
-            rows = list(reader)
+        try:
+            with open(args.input, mode="r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                if not reader.fieldnames:
+                    raise ValueError("Input CSV must include a header row.")
+                fieldnames = list(reader.fieldnames)
+                rows = list(reader)
 
-        out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
-        out_rows = []
-        for r in rows:
-            task_id = r.get("task_id") or r.get("case_id", "TASK-01")
-            target_id = r.get("target_identifier") or r.get("patient_synthetic_id", "TARGET-01")
-            
-            raw_primary = r.get("primary_metric") or r.get("metric_primary", 15.0)
-            raw_secondary = r.get("secondary_metric") or r.get("metric_secondary", 5.0)
-            status_desc = r.get("status_descriptor") or r.get("status_flag", "NOMINAL")
-            raw_critical = r.get("is_critical_flag") if "is_critical_flag" in r else r.get("is_stat", False)
-            if isinstance(raw_critical, str):
-                is_crit = raw_critical.strip().lower() in ("true", "1", "yes")
-            else:
-                is_crit = bool(raw_critical)
+            out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
+            out_rows = []
+            for row_number, row in enumerate(rows, start=2):
+                try:
+                    raw_primary = row.get("primary_metric") or row.get("metric_primary", 15.0)
+                    raw_secondary = row.get("secondary_metric") or row.get("metric_secondary", 5.0)
+                    raw_critical = row.get("is_critical_flag") if "is_critical_flag" in row else row.get("is_stat", False)
+                    payload = SystemTaskPayload(
+                        task_id=row.get("task_id") or row.get("case_id", "TASK-01"),
+                        target_identifier=row.get("target_identifier") or row.get("patient_synthetic_id", "TARGET-01"),
+                        primary_metric=float(raw_primary),
+                        secondary_metric=float(raw_secondary),
+                        status_descriptor=row.get("status_descriptor") or row.get("status_flag", "NOMINAL"),
+                        is_critical_flag=parse_bool(raw_critical),
+                    )
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"CSV row {row_number}: {exc}") from exc
 
-            payload = SystemTaskPayload(
-                task_id=task_id,
-                target_identifier=target_id,
-                primary_metric=float(raw_primary),
-                secondary_metric=float(raw_secondary),
-                status_descriptor=status_desc,
-                is_critical_flag=is_crit,
-            )
-            dossier = supervisor.process_task(payload)
-            row_dict = dict(r)
-            row_dict["overall_urgency"] = dossier.overall_urgency.value
-            row_dict["integrity_status"] = dossier.integrity_status.value
-            row_dict["total_alerts"] = dossier.total_alerts
-            row_dict["audit_hash"] = dossier.audit_hash
-            out_rows.append(row_dict)
+                dossier = supervisor.process_task(payload)
+                result = dict(row)
+                result["overall_urgency"] = dossier.overall_urgency.value
+                result["integrity_status"] = dossier.integrity_status.value
+                result["total_alerts"] = dossier.total_alerts
+                result["audit_hash"] = dossier.audit_hash
+                out_rows.append(result)
 
-        with open(args.output, mode="w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=out_fields)
-            writer.writeheader()
-            writer.writerows(out_rows)
+            with open(args.output, mode="w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=out_fields)
+                writer.writeheader()
+                writer.writerows(out_rows)
+        except (OSError, ValueError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+
         print(f"Processed {len(out_rows)} records -> {args.output}")
         return 0
 
     if args.command == "serve":
-        import uvicorn
-        from agents.api import app
-        print(f"Starting Clinical Billing Cdi Agent API server on http://{args.host}:{args.port}")
+        try:
+            import uvicorn
+            from agents.api import app
+        except ImportError:
+            print("FastAPI/uvicorn are optional. Install with: pip install '.[api]'")
+            return 1
         uvicorn.run(app, host=args.host, port=args.port)
         return 0
 
