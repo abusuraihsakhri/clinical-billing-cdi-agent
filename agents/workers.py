@@ -1,63 +1,62 @@
-"""
-Specialized Domain Worker Agents for Clinical Billing Cdi Agent.
-Domain: Clinical & Biomedical AI
-Standard: CAP / CLSI / ISO Standards
-"""
+"""Deterministic worker rules for the repository's demonstration workflow."""
 import uuid
-from typing import Dict, Any, List, Optional
-from .models import SystemTaskPayload, AgentAlert, UrgencyLevel, SystemIntegrityStatus
+from typing import List
+
+from .models import AgentAlert, SystemTaskPayload, UrgencyLevel
+
+
+PRIMARY_ALERT_LIMIT = 25.0
+SECONDARY_ALERT_LIMIT = 12.0
+STATUS_KEYWORDS = ("DISCORDANT", "ANOMALY", "FAIL", "REJECT", "SUSPICIOUS")
 
 
 class InvariantQCWorker:
-    """Worker 1: Primary Mathematical & Protocol Boundary Auditor."""
-
     @classmethod
     def evaluate(cls, payload: SystemTaskPayload) -> List[AgentAlert]:
-        alerts = []
-        if payload.primary_metric > 25.0:
-            alerts.append(AgentAlert(
-                alert_id=f"QC-{uuid.uuid4().hex[:6]}",
-                origin_worker="InvariantQCWorker",
-                urgency=UrgencyLevel.ELEVATED,
-                summary="Primary Metric Threshold Exceeded",
-                technical_details=f"Primary measurement ({payload.primary_metric:.2f}) exceeds upper reference limit (25.00) under CAP / CLSI / ISO Standards.",
-                actionable_remediation="Initiate recalibration workflow and review secondary parameters.",
-            ))
-        return alerts
+        if payload.primary_metric <= PRIMARY_ALERT_LIMIT:
+            return []
+        return [AgentAlert(
+            alert_id=f"QC-{uuid.uuid4().hex[:6]}",
+            origin_worker="InvariantQCWorker",
+            urgency=UrgencyLevel.ELEVATED,
+            summary="Primary metric review trigger",
+            technical_details=(
+                f"Primary measurement ({payload.primary_metric:.2f}) exceeds the "
+                f"configured demonstration threshold ({PRIMARY_ALERT_LIMIT:.2f})."
+            ),
+            actionable_remediation="Review the source data and local rule configuration.",
+        )]
 
 
 class SafetyEscalationWorker:
-    """Worker 2: Safety Boundary, Toxicity & Emergency Interlock Worker."""
-
     @classmethod
     def evaluate(cls, payload: SystemTaskPayload) -> List[AgentAlert]:
-        alerts = []
-        if payload.is_critical_flag or payload.secondary_metric > 12.0:
-            alerts.append(AgentAlert(
-                alert_id=f"SAFE-{uuid.uuid4().hex[:6]}",
-                origin_worker="SafetyEscalationWorker",
-                urgency=UrgencyLevel.CRITICAL_STAT if payload.is_critical_flag else UrgencyLevel.ELEVATED,
-                summary="Critical Safety Interlock Triggered",
-                technical_details=f"CriticalFlag={payload.is_critical_flag} with secondary index {payload.secondary_metric:.2f}.",
-                actionable_remediation="Execute immediate closed-loop escalation and notify attending supervisor.",
-            ))
-        return alerts
+        if not payload.is_critical_flag and payload.secondary_metric <= SECONDARY_ALERT_LIMIT:
+            return []
+        return [AgentAlert(
+            alert_id=f"SAFE-{uuid.uuid4().hex[:6]}",
+            origin_worker="SafetyEscalationWorker",
+            urgency=UrgencyLevel.CRITICAL_STAT if payload.is_critical_flag else UrgencyLevel.ELEVATED,
+            summary="Priority review trigger",
+            technical_details=(
+                f"PriorityFlag={payload.is_critical_flag}; secondary metric="
+                f"{payload.secondary_metric:.2f}; configured threshold={SECONDARY_ALERT_LIMIT:.2f}."
+            ),
+            actionable_remediation="Escalate for human review according to local policy.",
+        )]
 
 
 class ProtocolConformanceWorker:
-    """Worker 3: Spec Conformance, Anomaly Triage & Discordance Checker."""
-
     @classmethod
     def evaluate(cls, payload: SystemTaskPayload) -> List[AgentAlert]:
-        alerts = []
-        desc_upper = str(payload.status_descriptor).upper()
-        if any(w in desc_upper for w in ["DISCORDANT", "ANOMALY", "MUTANT", "VIOLATION", "FAIL", "REJECT"]):
-            alerts.append(AgentAlert(
-                alert_id=f"CONF-{uuid.uuid4().hex[:6]}",
-                origin_worker="ProtocolConformanceWorker",
-                urgency=UrgencyLevel.ELEVATED,
-                summary="Protocol Conformance Discordance Detected",
-                technical_details=f"Descriptor '{payload.status_descriptor}' indicates discordance with CAP / CLSI / ISO Standards standards.",
-                actionable_remediation="Re-evaluate input specimen or rerun secondary confirmation assay.",
-            ))
-        return alerts
+        descriptor = str(payload.status_descriptor).upper()
+        if not any(keyword in descriptor for keyword in STATUS_KEYWORDS):
+            return []
+        return [AgentAlert(
+            alert_id=f"CONF-{uuid.uuid4().hex[:6]}",
+            origin_worker="ProtocolConformanceWorker",
+            urgency=UrgencyLevel.ELEVATED,
+            summary="Status descriptor review trigger",
+            technical_details=f"Descriptor '{payload.status_descriptor}' matched a configured review keyword.",
+            actionable_remediation="Verify the underlying documentation before clinical, coding, or reimbursement action.",
+        )]
