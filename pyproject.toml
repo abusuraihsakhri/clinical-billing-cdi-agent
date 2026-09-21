@@ -4,24 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clinical-billing-cdi-engine"
-version = "2.0.0"
-description = "CDI-Sentinel: Clinical Documentation Improvement & HCC Risk Adjustment Engine"
+version = "2.1.0"
+description = "Deterministic clinical documentation workflow prototype with CLI, API, CSV processing, and a browser demo"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+authors = [{ name = "NAME" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Scientific/Engineering :: Medical Science Apps.",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.111,<1",
+    "pydantic>=2.7,<3",
+    "uvicorn>=0.30,<1",
+]
+test = [
+    "pytest>=8,<10",
+    "pydantic>=2.7,<3",
+]
 
 [project.scripts]
 clinical-billing-cdi-engine = "clinical_billing_cdi_agent.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/clinical-billing-cdi-engine"
-Repository = "https://github.com/abusuraihsakhri/clinical-billing-cdi-engine.git"
+Homepage = "https://abusuraihsakhri.github.io/clinical-billing-cdi-agent/"
+Repository = "https://github.com/abusuraihsakhri/clinical-billing-cdi-agent"
